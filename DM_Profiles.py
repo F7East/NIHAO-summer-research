@@ -4,6 +4,7 @@
 
 import numpy
 from scipy.optimize import curve_fit as fit
+from scipy.stats import chisquare
 import pynbody as pyn
 
 class DM_Profile:
@@ -19,14 +20,22 @@ class DM_Profile:
         self.s = snapshot
         self.s.physical_units()
         self.H = float(pyn.analysis.cosmology.H(self.s))
+#         self.den_chisq = 0.0
+#         self.vel_chisq = 0.0
     
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
         initial_guess = [10**10, 0.01]
-        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0 = initial_guess, bounds = (0,numpy.inf))
-        self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = ([1, 0], [10**4, numpy.inf]))
+        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0 = initial_guess, bounds = ([self.den[10], 0],numpy.inf))
+        self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))
+
         return self.param, self.param1 # for debugging purposes
     
+#     def chisq_pISO(self):
+#         self.fits_pISO()
+#         self.den_chisq = chisquare(self.den, f_exp = self.rho_pISO(self.radii, *self.param) )
+#         self.vel_chisq = chisquare(self.vel, f_exp = self.V_pISO(self.radii, *self.param1)  )
+        
     def pISO(self):
         # returns enclosed mass accoring to paper profile, the concentration and parameter arrays
         self.fits_pISO()
