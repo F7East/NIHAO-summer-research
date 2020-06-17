@@ -25,7 +25,7 @@ class DM_Profile:
     
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
-        initial_guess = [self.den[5], 10]
+        initial_guess = [self.den[0], 10]
         self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( (0, 0) ,numpy.inf))
         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))
 
