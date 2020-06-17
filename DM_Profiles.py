@@ -18,15 +18,15 @@ class DM_Profile:
         self.param1 = []
         # param gives [rho_s, r_s] and param1 gives [C200]
         self.s = snapshot
-        self.s.physical_units()
+#         self.s.physical_units()
         self.H = float(pyn.analysis.cosmology.H(self.s))
 #         self.den_chisq = 0.0
 #         self.vel_chisq = 0.0
     
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
-        initial_guess = [10**10, 0.01]
-        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0 = initial_guess, bounds = ([self.den[10], 0],numpy.inf))
+        initial_guess = [self.den[5], 10]
+        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( (0, 0) ,numpy.inf))
         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))
 
         return self.param, self.param1 # for debugging purposes
@@ -51,8 +51,8 @@ class DM_Profile:
         # we define M200 and N200 as the mass and the number of particles within r200 (Maccio 2008)
         return 4*numpy.pi*rho_s*(r_s**3)*((r/r_s)-numpy.arctan((r/r_s)))**0.5
 
-    def V_pISO(self, r, C_200, r_s):
+    def V_pISO(self, r, C_200, V_200):
 #         if self.param == []: raise CustomError('rho_pISO has not been fitted yet') # have to implement this later
 #         return 10*self.H*self.param[1]*C_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(C_200)/C_200))**0.5 # worse fit
-        return 10*self.H*r_s*C_200*((1-numpy.arctan((r/r_s))/(r/r_s))/(1-numpy.arctan(C_200)/C_200))**0.5
+        return V_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(C_200)/C_200))**0.5
     
