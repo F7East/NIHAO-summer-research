@@ -34,8 +34,8 @@ class DM_Profile:
     
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
-        initial_guess = [self.den[0], 10]
-        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( 0 ,numpy.inf))
+        initial_guess = [self.den[0], 0.01]
+        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf))
         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))
 
         return self.param, self.param1 # for debugging purposes
@@ -48,12 +48,13 @@ class DM_Profile:
     def pISO(self):
         # returns enclosed mass accoring to paper profile, the concentration and parameter arrays
         self.fits_pISO()
-        return self.M_pISO(self.param1[0]*self.param[1], self.param[0], self.param[1]), self.param1[0], self.param, self.param1
+        return self.M_pISO(self.param1[0]*(10**self.param[1]), self.param[0], self.param[1]), self.param1[0], self.param, self.param1
 
-    def rho_pISO(self, r, log_rho_s,r_s): 
+    def rho_pISO(self, r, log_rho_s, r_s): 
         # rho profile from the paper
         # r200 is the radius inside of which the average halo (bg paper)
-        return log_rho_s/numpy.log10((1+(r/r_s)**2))
+        return log_rho_s - numpy.log10((1+(r/r_s)**2))
+#         return log_rho_s - numpy.log10((1+(r*(10**k))**2))
 
     def M_pISO(self, r, log_rho_s, r_s):
         # velocity profile from the paper
