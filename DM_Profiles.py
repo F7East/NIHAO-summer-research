@@ -24,7 +24,7 @@ class DM_Profile:
 #         self.den_chisq = 0.0
 #         self.vel_chisq = 0.0
         self_zeros = []
-        for i in range((len(self.radii)-1)):
+        for i in range((len(self.radii))):
             if self.den[i] == 0.0:
                 self_zeros.append(i)
         self.den  =  numpy.delete(self.den, self_zeros)
@@ -35,7 +35,7 @@ class DM_Profile:
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
         initial_guess = [self.den[0], 0.01]
-        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf))
+        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf), maxfev = 10000)
         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))
 
         return self.param, self.param1 # for debugging purposes
