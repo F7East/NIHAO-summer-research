@@ -9,36 +9,42 @@ import pynbody as pyn
 
 class DM_Profile:
     
-    def __init__(self, radii, den, vel, snapshot, number):
+    def __init__(self, radii, den, vel, snapshot, number, r_200):
         # takes array of radii of shells, density and velocity at each shell, and snapshot itself 
         self.radii = radii
-        self.den = den
+        self.den = numpy.log10(den)
         self.vel = vel
-        self.param = [] 
-        self.param1 = []
+        self.param = []
+        self.r_200 = r_200/pyn.array.SimArray(1, 'kpc')
+#         self.param1 = []
         self.number = number
         # param gives [rho_s, r_s] and param1 gives [C200]
         self.s = snapshot
 #         self.s.physical_units()
-        self.H = float(pyn.analysis.cosmology.H(self.s))
+        self.H = float(pyn.analysis.cosmology.H(self.s))/1000
+        self.C_200 = 0
+        self.V_200 = 0
 #         self.den_chisq = 0.0
 #         self.vel_chisq = 0.0
-        self_zeros = []
-        for i in range((len(self.radii))):
-            if self.den[i] == 0.0:
-                self_zeros.append(i)
-        self.den  =  numpy.delete(self.den, self_zeros)
-        self.radii = numpy.delete(self.radii, self_zeros)
-        self.vel = numpy.delete(self.vel, self_zeros)
-        self.den = numpy.log10(self.den)
+#         So zeroing was useless 
+#         self_zeros = []
+#         for i in range((len(self.radii))):
+#             if self.den[i] == 0.0:
+#                 self_zeros.append(i)
+#         self.den  =  numpy.delete(self.den, self_zeros)
+#         self.radii = numpy.delete(self.radii, self_zeros)
+#         self.vel = numpy.delete(self.vel, self_zeros)
+#         self.den = numpy.log10(self.den)
     
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
-        initial_guess = [self.den[0], 0.01]
+        initial_guess = [self.den[0], 0.001]
         self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf), maxfev = 10000)
-        self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))
+        self.C_200 = self.r_200 / self.param[1]
+        self.V_200 = 10*self.H*self.r_200
+#         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))  # no need for this
 
-        return self.param, self.param1 # for debugging purposes
+        return self.param #, self.param1 # for debugging purposes
     
 #     def chisq_pISO(self):
 #         self.fits_pISO()
@@ -48,7 +54,7 @@ class DM_Profile:
     def pISO(self):
         # returns enclosed mass accoring to paper profile, the concentration and parameter arrays
         self.fits_pISO()
-        return self.M_pISO(self.param1[0]*(10**self.param[1]), self.param[0], self.param[1]), self.param1[0], self.param, self.param1
+        return self.M_pISO(self.r_200, self.param[0], self.param[1]), self.C_200, self.param
 
     def rho_pISO(self, r, log_rho_s, r_s): 
         # rho profile from the paper
@@ -61,8 +67,8 @@ class DM_Profile:
         # we define M200 and N200 as the mass and the number of particles within r200 (Maccio 2008)
         return 4*numpy.pi*(10**log_rho_s)*(r_s**3)*((r/r_s)-numpy.arctan((r/r_s)))**0.5
 
-    def V_pISO(self, r, C_200, V_200):
+    def V_pISO(self, r):
 #         if self.param == []: raise CustomError('rho_pISO has not been fitted yet') # have to implement this later
 #         return 10*self.H*self.param[1]*C_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(C_200)/C_200))**0.5 # worse fit
-        return V_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(C_200)/C_200))**0.5
+        return self.V_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(self.C_200)/self.C_200))**0.5
     
