@@ -9,13 +9,14 @@ import pynbody as pyn
 
 class DM_Profile:
     
-    def __init__(self, radii, den, vel, snapshot, number, r_200):
+    def __init__(self, profile, snapshot, number, r_200):
         # takes array of radii of shells, density and velocity at each shell, and snapshot itself 
-        self.radii = radii
-        self.den = numpy.log10(den)
-        self.vel = vel
+        self.radii = profile['rbins']
+        self.den = numpy.log10(profile['density'])
+        self.vel = profile['v_circ']
+        self.M_200 = profile['mass_enc'][-1]
         self.param = []
-        self.r_200 = r_200/pyn.array.SimArray(1, 'kpc')
+        self.r_200 = r_200
 #         self.param1 = []
         self.number = number
         # param gives [rho_s, r_s] and param1 gives [C200]
@@ -24,6 +25,11 @@ class DM_Profile:
         self.H = float(pyn.analysis.cosmology.H(self.s))/1000
         self.C_200 = 0
         self.V_200 = 0
+        self.den_error = []
+        self.log_den_error = []
+        for i in range(len(self.den)):
+            self.log_den_error.append(1./(numpy.sqrt(profile['n'][i])*numpy.log(10)))
+            self.den_error.append(profile['density'][i]/(numpy.sqrt(profile['n'][i])))
 #         self.den_chisq = 0.0
 #         self.vel_chisq = 0.0
 #         So zeroing was useless 
@@ -39,9 +45,10 @@ class DM_Profile:
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
         initial_guess = [self.den[0], 0.001]
-        self.param, covar = fit(self.rho_pISO, self.radii, self.den, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf), maxfev = 10000)
+        self.param, covar = fit(self.rho_pISO, self.radii, self.den, sigma = self.log_den_error, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf), maxfev = 10000)
         self.C_200 = self.r_200 / self.param[1]
         self.V_200 = 10*self.H*self.r_200
+        return covar
 #         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))  # no need for this
 
         return self.param #, self.param1 # for debugging purposes
@@ -53,8 +60,8 @@ class DM_Profile:
         
     def pISO(self):
         # returns enclosed mass accoring to paper profile, the concentration and parameter arrays
-        self.fits_pISO()
-        return self.M_pISO(self.r_200, self.param[0], self.param[1]), self.C_200, self.param
+        covar = self.fits_pISO()
+        return self.M_200, float(self.C_200), self.param, covar
 
     def rho_pISO(self, r, log_rho_s, r_s): 
         # rho profile from the paper
