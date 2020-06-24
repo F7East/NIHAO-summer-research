@@ -45,13 +45,13 @@ class DM_Profile:
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
         initial_guess = [self.den[0], 0.001]
-        self.param, covar = fit(self.rho_pISO, self.radii, self.den, sigma = self.log_den_error, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf), maxfev = 10000)
+        self.param, covar = fit(self.rho_pISO, self.radii, self.den, sigma = self.log_den_error, absolute_sigma =  True, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf), maxfev = 10000)
         self.C_200 = self.r_200 / self.param[1]
         self.V_200 = 10*self.H*self.r_200
         return covar
 #         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))  # no need for this
 
-        return self.param #, self.param1 # for debugging purposes
+#         return self.param #, self.param1 # for debugging purposes
     
 #     def chisq_pISO(self):
 #         self.fits_pISO()
