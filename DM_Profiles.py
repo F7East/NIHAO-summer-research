@@ -1,14 +1,124 @@
-# ----------------------------------------
-# pseudo isothermic profile (pISO)
-# this version of the code assumes that we take r_s from rho(r) and use it in V(r) calculation as x = r/r_s; we calculate M200 from paper derived profile 
-
 import numpy
 from scipy.optimize import curve_fit as fit
 from scipy.stats import chisquare
 import pynbody as pyn
 
+class model:
+    
+    '''
+    A model class stores stuff needed for my graphs
+    
+    **Input**
+    
+    *profile* a analysis.profile.Profile of already centered halo
+    
+    *name* for graphing and tracking purposes
+    
+    *h* hubble constant that is not H0
+    
+    *stellar_mass* total stellar mass of the halo
+    
+    *p_model* specify which model is used to fit the data
+    
+    
+    **Stores**
+    
+    *radii* rbins
+    
+    *log_den* log10 density bins
+    
+    *den_errors* according to Poisson distribution
+    
+    *log_den_error* using error propagation
+    
+    *r_200*, *M_200*, *C_200*
+    
+    *param* parameters for fit
+    
+    *covar* covariance matrix for fit parameters
+    
+    **
+    
+    '''
+    
+    def __init__(self, profile, name, h  =  0.1, stellar_mass = 0.1, pmodel = 'pISO'):
+
+       
+        
+        # radii and density
+        self.radii = profile['rbins']
+        self.log_den = numpy.log10(profile['density'])
+        
+        #errors in density
+        self.den_error = []
+        self.log_den_error = []
+        for i in range(len(self.log_den)):
+            self.log_den_error.append(1./(numpy.sqrt(profile['n'][i])*numpy.log(10)))
+            self.den_error.append(profile['density'][i]/(numpy.sqrt(profile['n'][i])))
+        
+        # 200's
+        self.r_200 = self.radii[-1]
+        self.M_200 = profile['mass_enc'][-1]
+        self.C_200 = 0.
+        
+        #for parameters and covariance
+        self.params = []
+        self.covar  = []
+        self.h = h
+        self.stellar_mass = stellar_mass
+        
+        #name and model
+        self.name = name
+        self.pmodel = pmodel
+        
+        #fitting
+        initial_guess = [self.log_den[0], 0.001]
+        bounding = ([self.log_den[-1], 0] , numpy.inf)
+        
+        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = initial_guess, bounds = bounding, maxfev = 10000)
+        
+        self.C_200 = self.r_200 / self.params[1]
+        
+    def log_rho(self, r, log_rho_s, r_s, *args):
+        '''
+        Function that is being fitted as a density profile
+        
+        **Input**
+        
+        *r* radii
+        
+        *log_rho_s* is log10 of rho_s which is easier to fit this way
+        
+        *r_s* 
+        
+        '''
+        
+        if self.pmodel == 'pISO':
+            return log_rho_s - numpy.log10((1+(r/r_s)**2))
+        if self.pmodel == 'Burket':
+            return log_rho_s - numpy.log10((1+(r/r_s)**2)) - numpy.log10(1+(r/r_s))
+        if self.pmodel == 'NFW':
+            return log_rho_s - 2*numpy.log10(1+(r/r_s)) - numpy.log10(r/r_s)
+        
+    def output(self):
+        '''
+        Returns most needed things for futre plots
+        '''
+        
+        return (self.M_200, self.C_200), self.params, self.covar
+        
+def models():
+    '''
+    This is a way of keeping all profile names here
+    '''
+    return ('pISO', 'Burket', 'NFW', 'Einasto', 'DC14', 'coreNFW', 'Lucky13')
+
+
 class DM_Profile:
     
+    """
+    This is needed in case somethign does not work out
+    """
     def __init__(self, profile, snapshot, number, r_200):
         # takes array of radii of shells, density and velocity at each shell, and snapshot itself 
         self.radii = profile['rbins']
@@ -22,7 +132,7 @@ class DM_Profile:
         # param gives [rho_s, r_s] and param1 gives [C200]
         self.s = snapshot
 #         self.s.physical_units()
-        self.H = float(pyn.analysis.cosmology.H(self.s))/1000
+#         self.H = float(pyn.analysis.cosmology.H(self.s))/1000
         self.C_200 = 0
         self.V_200 = 0
         self.den_error = []
@@ -32,22 +142,13 @@ class DM_Profile:
             self.den_error.append(profile['density'][i]/(numpy.sqrt(profile['n'][i])))
 #         self.den_chisq = 0.0
 #         self.vel_chisq = 0.0
-#         So zeroing was useless 
-#         self_zeros = []
-#         for i in range((len(self.radii))):
-#             if self.den[i] == 0.0:
-#                 self_zeros.append(i)
-#         self.den  =  numpy.delete(self.den, self_zeros)
-#         self.radii = numpy.delete(self.radii, self_zeros)
-#         self.vel = numpy.delete(self.vel, self_zeros)
-#         self.den = numpy.log10(self.den)
-    
+
     def fits_pISO(self):
         # fits rho_pISO and V_pISO with their parameters
         initial_guess = [self.den[0], 0.001]
         self.param, covar = fit(self.rho_pISO, self.radii, self.den, sigma = self.log_den_error, absolute_sigma =  True, p0  = initial_guess, bounds = ( [self.den[-1], 0] , numpy.inf), maxfev = 10000)
         self.C_200 = self.r_200 / self.param[1]
-        self.V_200 = 10*self.H*self.r_200
+#         self.V_200 = 10*self.H*self.r_200
         return covar
 #         self.param1, covar1 = fit(self.V_pISO, self.radii, self.vel, bounds = (0, numpy.inf))  # no need for this
 
@@ -74,8 +175,8 @@ class DM_Profile:
         # we define M200 and N200 as the mass and the number of particles within r200 (Maccio 2008)
         return 4*numpy.pi*(10**log_rho_s)*(r_s**3)*((r/r_s)-numpy.arctan((r/r_s)))**0.5
 
-    def V_pISO(self, r):
-#         if self.param == []: raise CustomError('rho_pISO has not been fitted yet') # have to implement this later
-#         return 10*self.H*self.param[1]*C_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(C_200)/C_200))**0.5 # worse fit
-        return self.V_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(self.C_200)/self.C_200))**0.5
+#     def V_pISO(self, r):
+# #         if self.param == []: raise CustomError('rho_pISO has not been fitted yet') # have to implement this later
+# #         return 10*self.H*self.param[1]*C_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(C_200)/C_200))**0.5 # worse fit
+#         return self.V_200*((1-numpy.arctan((r/self.param[1]))/(r/self.param[1]))/(1-numpy.arctan(self.C_200)/self.C_200))**0.5
     
