@@ -75,18 +75,34 @@ class model:
         self.h = h
         
         #Einasto coefficients
-        if self.pmodel == 'Einasto':
-            m = numpy.log10(self.halo_mass * self.h /(10**12 * pyn.array.SimArray(1., units = 'Msol') ))
+        if self.pmodel == 'Einasto_ae':
+            m = numpy.log10(halo_mass * h /(10**12 * pyn.array.SimArray(1., units = 'Msol') ))
             ν = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
             self.alpha_e = 0.0095*ν**2 + 0.155
+            
+        #DC14 coefficients
+        if self.pmodel == 'DC14':
+            X = numpy.log10(stellar_mass/halo_mass)
+            self.alpha = 2.94 - numpy.log10(10**((X+2.33)*(-1.08)) + 10**((X+2.33)*2.29))
+            self.beta  = 4.23 + 1.34*X + 0.26*X**2
+            self.gamma = -0.06 + numpy.log10(10**((X+2.56)*(-0.68)) + 10**(X+2.56))
         
-        #fitting
-        initial_guess = [self.log_den[0], 0.001]
-        bounding = ([self.log_den[-1], 0] , numpy.inf)
         
-        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = initial_guess, bounds = bounding, maxfev = 600)
+        #fitting with different number of parameters
+        if self.pmodel == 'Einasto':
+            self.initial_guess = [self.log_den[0], 0.001, 1]
+            self.bounding = ([self.log_den[-1], 0, -numpy.inf] , numpy.inf)
+        else:
+            self.initial_guess = [self.log_den[0], 0.001]
+            self.bounding = ([self.log_den[-1], 0] , numpy.inf)
+        
+        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 600)
         
         self.C_200 = self.r_200 / self.params[1]
+        
+        #additional arguments for Einasto
+        
+        
         
     def log_rho(self, r, log_rho_s, r_s, *args):
         '''
@@ -110,8 +126,12 @@ class model:
             return log_rho_s - numpy.log10(1+(r/r_s))*2 - numpy.log10(r/r_s)
         if self.pmodel == 'Lucky13':
             return log_rho_s - numpy.log10(1+(r/r_s))**3
-        if self.pmodel == 'Einasto':
+        if self.pmodel == 'Einasto_ae':
             return log_rho_s - 2/(numpy.log(10)*self.alpha_e)*((r/r_s)**self.alpha_e-1)
+        if self.pmodel == 'Einasto':
+            return log_rho_s - 2/(numpy.log(10)*args[0])*((r/r_s)**args[0])
+        if self.pmodel == 'DC14':
+            return log_rho_s - self.gamma*numpy.log10(r/r_s) - (self.beta - self.gamma)/self.alpha*numpy.log10(1+(r/r_s)**self.alpha)
         
     def output(self):
         '''
@@ -124,7 +144,7 @@ def models():
     '''
     This is a way of keeping all profile names here
     '''
-    return ('pISO', 'Burket', 'NFW', 'Einasto', 'DC14', 'coreNFW', 'Lucky13')
+    return ('pISO', 'Burket', 'NFW', 'Einasto', 'DC14', 'coreNFW', 'Lucky13', 'Einasto_ae')
 
 
 class DM_Profile:
