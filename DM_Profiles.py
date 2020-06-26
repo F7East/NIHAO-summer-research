@@ -33,7 +33,7 @@ class model:
     
     *r_200*, *M_200*, *C_200*
     
-    *param* parameters for fit
+    *params* parameters for fit
     
     *covar* covariance matrix for fit parameters
     
@@ -41,10 +41,9 @@ class model:
     
     '''
     
-    def __init__(self, profile, name, h  =  0.1, stellar_mass = 0.1, pmodel = 'pISO'):
+    def __init__(self, profile, name, h  =  0.1, stellar_mass = 0.1, halo_mass = 0.1, pmodel = 'pISO'):
 
        
-        
         # radii and density
         self.radii = profile['rbins']
         self.log_den = numpy.log10(profile['density'])
@@ -64,24 +63,34 @@ class model:
         #for parameters and covariance
         self.params = []
         self.covar  = []
-        self.h = h
-        self.stellar_mass = stellar_mass
         
         #name and model
         self.name = name
         self.pmodel = pmodel
         
+        #stellar and halo mass, hubble
+        
+        self.stellar_mass = stellar_mass
+        self.halo_mass = halo_mass
+        self.h = h
+        
+        #Einasto coefficients
+        if self.pmodel == 'Einasto':
+            m = numpy.log10(self.halo_mass * self.h /(10**12 * pyn.array.SimArray(1., units = 'Msol') ))
+            ν = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
+            self.alpha_e = 0.0095*ν**2 + 0.155
+        
         #fitting
         initial_guess = [self.log_den[0], 0.001]
         bounding = ([self.log_den[-1], 0] , numpy.inf)
         
-        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = initial_guess, bounds = bounding, maxfev = 10000)
+        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = initial_guess, bounds = bounding, maxfev = 600)
         
         self.C_200 = self.r_200 / self.params[1]
         
     def log_rho(self, r, log_rho_s, r_s, *args):
         '''
-        Function that is being fitted as a density profile
+        Function that is being fitted as a density profile that come from the paper
         
         **Input**
         
@@ -98,7 +107,11 @@ class model:
         if self.pmodel == 'Burket':
             return log_rho_s - numpy.log10((1+(r/r_s)**2)) - numpy.log10(1+(r/r_s))
         if self.pmodel == 'NFW':
-            return log_rho_s - 2*numpy.log10(1+(r/r_s)) - numpy.log10(r/r_s)
+            return log_rho_s - numpy.log10(1+(r/r_s))*2 - numpy.log10(r/r_s)
+        if self.pmodel == 'Lucky13':
+            return log_rho_s - numpy.log10(1+(r/r_s))**3
+        if self.pmodel == 'Einasto':
+            return log_rho_s - 2/(numpy.log(10)*self.alpha_e)*((r/r_s)**self.alpha_e-1)
         
     def output(self):
         '''
