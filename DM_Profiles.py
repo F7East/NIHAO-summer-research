@@ -1,6 +1,7 @@
 import numpy
 from scipy.optimize import curve_fit as fit
 from scipy.stats import chisquare
+from pynbody import units
 import pynbody as pyn
 
 class model:
@@ -13,8 +14,6 @@ class model:
     *profile* a analysis.profile.Profile of already centered halo
     
     *name* for graphing and tracking purposes
-    
-    *h* hubble constant that is not H0
     
     *stellar_mass* total stellar mass of the halo
     
@@ -41,7 +40,7 @@ class model:
     
     '''
     
-    def __init__(self, profile, name, h  =  0.1, stellar_mass = 0.1, halo_mass = 0.1, pmodel = 'pISO'):
+    def __init__(self, profile, stellar_mass, halo_mass, shm_radius, r_200, name, pmodel = 'pISO'):
 
        
         # radii and density
@@ -56,7 +55,7 @@ class model:
             self.den_error.append(profile['density'][i]/(numpy.sqrt(profile['n'][i])))
         
         # 200's
-        self.r_200 = self.radii[-1]
+        self.r_200 = r_200
         self.M_200 = profile['mass_enc'][-1]
         self.C_200 = 0.
         
@@ -72,13 +71,16 @@ class model:
         
         self.stellar_mass = stellar_mass
         self.halo_mass = halo_mass
-        self.h = h
+        
+        #stellar half-mass radius
+        self.shm_radius = shm_radius
         
         #Einasto coefficients
         if self.pmodel == 'Einasto_ae':
-            m = numpy.log10(halo_mass * h /(10**12 * pyn.array.SimArray(1., units = 'Msol') ))
+            halo_mass.convert_units(units.h*units.Msol*10**12)
+            m = numpy.log10(float(halo_mass))
             ν = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
-            self.alpha_e = 0.0095*ν**2 + 0.155
+            self.alpha_e = (0.0095*ν**2 + 0.155)
             
         #DC14 coefficients
         if self.pmodel == 'DC14':
@@ -86,12 +88,22 @@ class model:
             self.alpha = 2.94 - numpy.log10(10**((X+2.33)*(-1.08)) + 10**((X+2.33)*2.29))
             self.beta  = 4.23 + 1.34*X + 0.26*X**2
             self.gamma = -0.06 + numpy.log10(10**((X+2.56)*(-0.68)) + 10**(X+2.56))
+            
+            
+        #coreNFW coefficients
+        
+        if self.pmodel == 'coreNFW':
+            self.G = float(units.G.ratio(profile['rbins'].units**3*profile['mass'].units**-1*units.Gyr**-2))
         
         
         #fitting with different number of parameters
         if self.pmodel == 'Einasto':
             self.initial_guess = [self.log_den[0], 0.001, 1]
             self.bounding = ([self.log_den[-1], 0, -numpy.inf] , numpy.inf)
+        elif self.pmodel == 'coreNFW':
+            self.initial_guess = [self.log_den[0], 0.001, 2., 0.1]
+            self.bounding = ([self.log_den[-1], 0, 0, 0] , numpy.inf)
+            
         else:
             self.initial_guess = [self.log_den[0], 0.001]
             self.bounding = ([self.log_den[-1], 0] , numpy.inf)
@@ -100,8 +112,7 @@ class model:
         
         self.C_200 = self.r_200 / self.params[1]
         
-        #additional arguments for Einasto
-        
+
         
         
     def log_rho(self, r, log_rho_s, r_s, *args):
@@ -123,7 +134,7 @@ class model:
         if self.pmodel == 'Burket':
             return log_rho_s - numpy.log10((1+(r/r_s)**2)) - numpy.log10(1+(r/r_s))
         if self.pmodel == 'NFW':
-            return log_rho_s - numpy.log10(1+(r/r_s))*2 - numpy.log10(r/r_s)
+            return self.NFW(r, log_rho_s, r_s)
         if self.pmodel == 'Lucky13':
             return log_rho_s - numpy.log10(1+(r/r_s))**3
         if self.pmodel == 'Einasto_ae':
@@ -132,6 +143,8 @@ class model:
             return log_rho_s - 2/(numpy.log(10)*args[0])*((r/r_s)**args[0])
         if self.pmodel == 'DC14':
             return log_rho_s - self.gamma*numpy.log10(r/r_s) - (self.beta - self.gamma)/self.alpha*numpy.log10(1+(r/r_s)**self.alpha)
+        if self.pmodel == 'coreNFW':
+            return self.coreNFW(r, log_rho_s, r_s, args[0], args[1])
         
     def output(self):
         '''
@@ -139,6 +152,32 @@ class model:
         '''
         
         return (self.M_200, self.C_200), self.params, self.covar
+    
+    #Functions that are needed for coreNFW fit
+    def r_c(self, etta):
+        return etta*self.shm_radius
+    
+    def NFW(self, r, log_rho_s, r_s ):
+        return log_rho_s - numpy.log10(1+(r/r_s))*2 - numpy.log10(r/r_s)
+    
+    def M_NFW(self, r, log_rho_s, r_s):
+        return 4*numpy.pi*(10**log_rho_s)*(r_s**3)*(numpy.log(1+r/r_s)+(r/r_s)/(1+r/r_s))
+    
+    def f(self, r, etta):
+        return numpy.tanh(r/self.r_c(etta))
+    
+    def n(self, r, log_rho_s, r_s, k):
+        t_sf = 14.
+        return numpy.tanh(k*t_sf/self.t_dyn(log_rho_s, r_s))
+    
+    def t_dyn(self, log_rho_s, r_s):
+        return 2*numpy.pi*numpy.sqrt(r_s**3/(self.G*self.M_NFW(r_s, log_rho_s, r_s)))
+        # question: M_NFW(r_s) means M_NFW(r_s, log_rho_s, r_s)? probably yes
+    
+    def coreNFW(self, r, log_rho_s, r_s, etta, k):
+        return self.f(r, etta)**self.n(r, log_rho_s, r_s, k)*self.NFW(r, log_rho_s, r_s)+self.n(r, log_rho_s, r_s, k)*self.f(r, etta)**(self.n(r, log_rho_s, r_s, k)-1.)*(1.-self.f(r, etta)**2)*self.M_NFW(r, log_rho_s, r_s)/(4*numpy.pi*r**2*self.r_c(etta))
+        
+        
         
 def models():
     '''
