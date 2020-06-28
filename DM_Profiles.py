@@ -175,7 +175,7 @@ class model:
         # question: M_NFW(r_s) means M_NFW(r_s, log_rho_s, r_s)? probably yes
     
     def coreNFW(self, r, log_rho_s, r_s, etta, k):
-        return self.f(r, etta)**self.n(r, log_rho_s, r_s, k)*self.NFW(r, log_rho_s, r_s)+self.n(r, log_rho_s, r_s, k)*self.f(r, etta)**(self.n(r, log_rho_s, r_s, k)-1.)*(1.-self.f(r, etta)**2)*self.M_NFW(r, log_rho_s, r_s)/(4*numpy.pi*r**2*self.r_c(etta))
+        return numpy.log10(self.f(r, etta)**self.n(r, log_rho_s, r_s, k)*10**self.NFW(r, log_rho_s, r_s)+self.n(r, log_rho_s, r_s, k)*self.f(r, etta)**(self.n(r, log_rho_s, r_s, k)-1.)*(1.-self.f(r, etta)**2)*self.M_NFW(r, log_rho_s, r_s)/(4*numpy.pi*r**2*self.r_c(etta)))
         
         
         
