@@ -104,7 +104,7 @@ class model:
             self.bounding = ([self.log_den[-1], 0, -numpy.inf] , numpy.inf)
             
         elif self.pmodel == 'coreNFW':
-            self.initial_guess = [self.log_den[0], 1, 1.75, 0.04]
+                self.initial_guess = [self.log_den[0], 1, 100, 1]
             self.bounding = ([self.log_den[-1], 0, 0, 0] , numpy.inf)
             
         else:
