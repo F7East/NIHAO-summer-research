@@ -111,7 +111,7 @@ class model:
             self.initial_guess = [self.log_den[0], 1]
             self.bounding = ([self.log_den[-1], 0] , numpy.inf)
         
-        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 1000)
+        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 10000)
         
         self.C_200 = self.r_200 / self.params[1]
         
@@ -139,7 +139,7 @@ class model:
         if self.pmodel == 'NFW':
             return self.NFW(r, log_rho_s, r_s)
         if self.pmodel == 'Lucky13':
-            return log_rho_s - lg(1+(r/r_s))**3
+            return log_rho_s - 3*lg(1+(r/r_s))
         if self.pmodel == 'Einasto_ae':
             return log_rho_s - 2/(numpy.log(10)*self.alpha_e)*((r/r_s)**self.alpha_e-1)
         if self.pmodel == 'Einasto':
