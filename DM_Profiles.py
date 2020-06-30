@@ -76,6 +76,19 @@ class model:
         #stellar half-mass radius
         self.shm_radius = shm_radius
         
+        #fitting with different number of parameters
+        if self.pmodel == 'Einasto':
+            self.initial_guess = [self.log_den[0], 1, 1]
+            self.bounding = ([self.log_den[-1], 0, -numpy.inf] , numpy.inf)
+            
+        elif self.pmodel == 'coreNFW':
+            self.initial_guess = [1.75, 0.04]
+            self.bounding = ( 0 , numpy.inf)
+            
+        else:
+            self.initial_guess = [self.log_den[0], 1]
+            self.bounding = ([self.log_den[-1], 0] , numpy.inf)
+        
         #Einasto coefficients
         if self.pmodel == 'Einasto_ae':
             halo_mass.in_units(units.h*units.Msol*10**12)
@@ -92,28 +105,21 @@ class model:
             
             
         #coreNFW coefficients
-        
+        self.NFW_params = 'no NFW parameters were called by coreNFW'
+        self.NFW_covar  = 'no NFW parameters were called by coreNFW'
         if self.pmodel == 'coreNFW':
             self.G = float(units.G.ratio(profile['rbins'].units**3*profile['mass'].units**-1*units.Gyr**-2))
             self.t_sf = t_sf
+            self.NFW_params, self.NFW_covar = self.fits(self.NFW)
         
-        
-        #fitting with different number of parameters
-        if self.pmodel == 'Einasto':
-            self.initial_guess = [self.log_den[0], 1, 1]
-            self.bounding = ([self.log_den[-1], 0, -numpy.inf] , numpy.inf)
-            
-        elif self.pmodel == 'coreNFW':
-            self.initial_guess = [self.log_den[0], 1, 1.75, 0.04]
-            self.bounding = ([self.log_den[-1], 0, 0, 0] , numpy.inf)
-            
-        else:
-            self.initial_guess = [self.log_den[0], 1]
-            self.bounding = ([self.log_den[-1], 0] , numpy.inf)
-        
-        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 1000)
-        
+        self.params, self.covar = self.fits(self.log_rho)
         self.C_200 = self.r_200 / self.params[1]
+        
+    def fits(self, function):
+        '''
+        This fits the data according to the funcion given
+        '''
+        return fit(function, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 10000)
         
 
         
@@ -147,14 +153,14 @@ class model:
         if self.pmodel == 'DC14':
             return log_rho_s - self.gamma*lg(r/r_s) - (self.beta - self.gamma)/self.alpha*lg(1+(r/r_s)**self.alpha)
         if self.pmodel == 'coreNFW':
-            return self.coreNFW(r, log_rho_s, r_s, args[0], args[1])
+            return self.coreNFW(r, log_rho_s, r_s)
         
     def output(self):
         '''
         Returns most needed things for futre plots
         '''
         
-        return (self.M_200, self.C_200), self.params, self.covar
+        return (self.M_200, self.C_200), self.params, self.covar, (self.NFW_params, self.NFW_covar)*(self.pmodel == 'coreNFW') 
     
     #Functions that are needed for coreNFW fit
     def r_c(self, etta):
@@ -176,7 +182,9 @@ class model:
         return 2*numpy.pi*numpy.sqrt(r_s**3/(self.G*self.M_NFW(r_s, log_rho_s, r_s)))
         # question: M_NFW(r_s) means M_NFW(r_s, log_rho_s, r_s)? probably yes
 
-    def coreNFW(self, r, log_rho_s, r_s, etta, k):
+    def coreNFW(self, r, etta, k):
+        log_rho_s = self.NFW_params[0]
+        r_s = self.NFW_params[1]
         return  (2*self.n( log_rho_s, r_s, k)-1)*lg(self.f(r,etta)) + self.NFW(r, log_rho_s, r_s) + lg(self.M_NFW(r, log_rho_s, r_s)) +  lg(self.n( log_rho_s, r_s, k)) + lg(1-self.f(r, etta)**2) - lg(numpy.pi*4*self.r_c(etta)) - 2*lg(r)
         
         
