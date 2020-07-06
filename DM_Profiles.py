@@ -80,8 +80,8 @@ class model:
         if self.pmodel == 'Einasto_ae':
             halo_mass.in_units(units.h*units.Msol*10**12)
             m = lg(halo_mass)
-            ν = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
-            self.alpha_e = (0.0095*ν**2 + 0.155)
+            v = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
+            self.alpha_e = (0.0095*v**2 + 0.155)
             
         #DC14 coefficients
         if self.pmodel == 'DC14':
@@ -104,14 +104,14 @@ class model:
             self.bounding = ([self.log_den[-1], 0, -numpy.inf] , numpy.inf)
             
         elif self.pmodel == 'coreNFW':
-                self.initial_guess = [self.log_den[0], 1, 100, 1]
+            self.initial_guess = [self.log_den[0], 1, 100, 1]
             self.bounding = ([self.log_den[-1], 0, 0, 0] , numpy.inf)
             
         else:
             self.initial_guess = [self.log_den[0], 1]
             self.bounding = ([self.log_den[-1], 0] , numpy.inf)
         
-        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 10000)
+        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 100000)
         
         self.C_200 = self.r_200 / self.params[1]
         
