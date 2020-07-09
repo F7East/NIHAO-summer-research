@@ -5,6 +5,49 @@ from pynbody import units
 import pynbody as pyn
 from numpy import log10 as lg
 
+def model_prep(halo, minimum, maximum):
+    
+    """
+    This prepares profile for model to take in. It is run separately because this is a heavy function
+    
+    **Input**
+    
+    *halo* is just halo object
+    
+    
+    **Output**
+    
+    *profile* is normal pynbody profile for dark matter
+    
+    *sm* total stellar mass
+    
+    *hm* total halo mass
+    
+    *shm_radius* stellar half-mass radius
+    
+    *r_200* virial radius over 200 times the critical density of snapshot
+    
+    *t_sf* run time?
+    
+    """
+    
+    # centering to generate variables and placing particles back 
+    with pyn.analysis.angmom.faceon(halo, cen_size  =  '1 kpc'):
+        
+        r_200 = float(pyn.analysis.halo.virial_radius(halo, overden = 200))
+        profile = pyn.analysis.profile.Profile(halo.d, min = minimum, max = maximum, ndim = 3, type = 'log', nbins = 50)
+        stellar_profile = pyn.analysis.profile.Profile(halo.s, min = 0.01, max = r_200, ndim = 2, type = 'equaln', nbins = 10000)
+        shm_radius = stellar_profile['rbins'][len(stellar_profile['rbins'])//2]
+#         profile = pyn.analysis.profile.Profile(halo.d, min = 2*max(halo.d['eps']), max = 0.7*r_200, ndim = 3, type = 'log', nbins = 50)
+    
+    # calculating steallar and halo mass
+    
+    sm = halo.s['mass'].sum()
+    hm = halo['mass'].sum()
+    t_sf = halo.properties['time'].in_units('Gyr')
+        
+    return (profile, sm, hm, shm_radius, r_200, t_sf)
+
 class model:
     
     '''
@@ -78,7 +121,7 @@ class model:
         
         #Einasto coefficients
         if self.pmodel == 'Einasto_ae':
-            halo_mass.in_units(units.h*units.Msol*10**12)
+            halo_mass.in_units(units.Msol*10**12/units.h)
             m = lg(halo_mass)
             v = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
             self.alpha_e = (0.0095*v**2 + 0.155)
@@ -111,7 +154,7 @@ class model:
             self.initial_guess = [self.log_den[0], 1]
             self.bounding = ([self.log_den[-1], 0] , numpy.inf)
         
-        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 100000)
+        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 10000)
         
         self.C_200 = self.r_200 / self.params[1]
         
