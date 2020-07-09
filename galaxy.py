@@ -128,7 +128,7 @@ class galaxy:
             ax[rows-1][b].set_xlabel('$R$ [kpc]')
 
         fig.suptitle("Panel plot for " + self.galaxy_path.split('/')[-1] + ' density profiles', fontsize = 16)
-        plt.show()
+        fig.show()
 
         #saving the file
         if to_save:
@@ -140,6 +140,7 @@ class galaxy:
         This creates a bar plot of C200 values which can be saved
         '''
         plt.clf()
+        fig = plt.figure(figsize = (7,5))
         C_200list = []
         e_C_200list = []
         lables = DM_Profiles.models()
@@ -148,12 +149,12 @@ class galaxy:
             C_200list.append(self.C200s[label][0])
             e_C_200list.append(self.C200s[label][1])
         x = range(1,len(C_200list)+1)
-        plt.title('C$_{200}$ ' + "values for " + self.galaxy_path.split('/')[-1])
-        plt.bar(x, C_200list, color = 'blue')
-        plt.errorbar(x, C_200list, yerr = e_C_200list, color = 'red', fmt = 'none')
-        plt.xticks(x, lables)
-        plt.yscale('linear')
-        plt.xticks(rotation = 30)
+        fig.title('C$_{200}$ ' + "values for " + self.galaxy_path.split('/')[-1])
+        fig.bar(x, C_200list, color = 'blue')
+        fig.errorbar(x, C_200list, yerr = e_C_200list, color = 'red', fmt = 'none')
+        fig.xticks(x, lables)
+        fig.yscale('linear')
+        fig.xticks(rotation = 30)
         if to_save:
-            plt.savefig('./Graphs/C200.png')
-        plt.show()
+            fig.savefig('./Graphs/C200.png')
+        fig.show()
