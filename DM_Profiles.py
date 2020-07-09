@@ -5,7 +5,7 @@ from pynbody import units
 import pynbody as pyn
 from numpy import log10 as lg
 
-def model_prep(halo, minimum, maximum):
+def model_prep(halo, minimum, p_r200):
     
     """
     This prepares profile for model to take in. It is run separately because this is a heavy function
@@ -35,11 +35,19 @@ def model_prep(halo, minimum, maximum):
     with pyn.analysis.angmom.faceon(halo, cen_size  =  '1 kpc'):
         
         r_200 = float(pyn.analysis.halo.virial_radius(halo, overden = 200))
-        profile = pyn.analysis.profile.Profile(halo.d, min = minimum, max = maximum, ndim = 3, type = 'log', nbins = 50)
+        
+        eps = 2*(halo['eps'][0])
+        
+        if minimum < eps:
+            minimum = eps
+            
+        if p_r200 > 1.0:
+            p_r200 = 1.0
+            
+        profile = pyn.analysis.profile.Profile(halo.d, min = minimum, max = r_200*p_r200, ndim = 3, type = 'log', nbins = 50)
         stellar_profile = pyn.analysis.profile.Profile(halo.s, min = 0.01, max = r_200, ndim = 2, type = 'equaln', nbins = 10000)
         shm_radius = stellar_profile['rbins'][len(stellar_profile['rbins'])//2]
-#         profile = pyn.analysis.profile.Profile(halo.d, min = 2*max(halo.d['eps']), max = 0.7*r_200, ndim = 3, type = 'log', nbins = 50)
-    
+
     # calculating steallar and halo mass
     
     sm = halo.s['mass'].sum()
@@ -184,9 +192,9 @@ class model:
         if self.pmodel == 'Lucky13':
             return log_rho_s - 3*lg(1+(r/r_s))
         if self.pmodel == 'Einasto_ae':
-            return log_rho_s - 2/(numpy.log(10)*self.alpha_e)*((r/r_s)**self.alpha_e-1)
+            return log_rho_s - 2/(self.alpha_e)*((r/r_s)**self.alpha_e-1)*lg(numpy.e)
         if self.pmodel == 'Einasto':
-            return log_rho_s - 2/(numpy.log(10)*args[0])*((r/r_s)**args[0])
+            return log_rho_s - 2/(args[0])*((r/r_s)**args[0])*lg(numpy.e)
         if self.pmodel == 'DC14':
             return log_rho_s - self.gamma*lg(r/r_s) - (self.beta - self.gamma)/self.alpha*lg(1+(r/r_s)**self.alpha)
         if self.pmodel == 'coreNFW':
@@ -229,4 +237,3 @@ def models():
     This is a way of keeping all profile names here
     '''
     return ('pISO', 'Burket', 'NFW', 'Einasto', 'DC14', 'coreNFW', 'Lucky13')
-    
