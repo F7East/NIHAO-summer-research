@@ -69,13 +69,32 @@ class galaxy:
         
         M200 = float(self.variables[2].in_units(units.Msol*10**12/units.h))
         a = 0.830
-        b = 0.098 #ask about this whether its a typo or not???
-            C200 = 10**a/M200**b
+        b = 0.098
+        C200 = 10**a/M200**b
+        CNFW = C200
         eC200 = 0.0 #have to figure this out later
         
-        C200s.update({"Maccio2008" : (C200, eC200)})
+        C200s.update({"M_NCL" : (C200, eC200)})
+        
+        #for Einasto
+        a = 0.977
+        b = 0.130
+        C200 = 10**a/M200**b
+        eC200 = 0.0 #have to figure this out later
+        
+        C200s.update({"M_Einasto" : (C200, eC200)})
+        
+        #for DC14
+        
+        X = numpy.log10(self.variables[1]/self.variables[2])
+        C200 = CNFW*(1.0+0.00003*numpy.exp(3.4*(X+4.5)))
+        eC200 = 0.0 #same shit here
+        C200s.update({"M_DC14" : (C200, eC200)})
         
         return C200s
+        
+        
+        
         
         
     
@@ -132,7 +151,7 @@ class galaxy:
 
         #saving the file
         if to_save:
-            fig.savefig('./Graphs/density_plot.png')
+            fig.savefig('./Graphs/' + self.galaxy_path.split('/')[-1] + 'density_plot.png')
     
     def C200_plot(self, to_save = False):
         
@@ -143,18 +162,17 @@ class galaxy:
         fig = plt.figure(figsize = (7,5))
         C_200list = []
         e_C_200list = []
-        lables = DM_Profiles.models()
-        lables += ('Maccio2008',)
+        lables = self.C200s.keys()
         for label in lables:
             C_200list.append(self.C200s[label][0])
             e_C_200list.append(self.C200s[label][1])
         x = range(1,len(C_200list)+1)
-        fig.title('C$_{200}$ ' + "values for " + self.galaxy_path.split('/')[-1])
-        fig.bar(x, C_200list, color = 'blue')
-        fig.errorbar(x, C_200list, yerr = e_C_200list, color = 'red', fmt = 'none')
-        fig.xticks(x, lables)
-        fig.yscale('linear')
-        fig.xticks(rotation = 30)
+        fig.suptitle('C$_{200}$ ' + "values for " + self.galaxy_path.split('/')[-1])
+        plt.bar(x, C_200list, color = 'blue')
+        plt.errorbar(x, C_200list, yerr = e_C_200list, color = 'red', fmt = 'none')
+        plt.xticks(x, lables)
+        plt.yscale('linear')
+        plt.xticks(rotation = 30)
         if to_save:
-            fig.savefig('./Graphs/C200.png')
+            fig.savefig('./Graphs/' + self.galaxy_path.split('/')[-1] + 'C200.png')
         fig.show()
