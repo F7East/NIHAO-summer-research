@@ -17,8 +17,6 @@ class galaxy:
     
     **Stores**
     
-    *halo* halo 1 of the snapshot
-    
     *variables* see "output" of DM_Profies.model_prep
     
     *dmprofiles* are "model" objects from DM_Profiles
@@ -33,22 +31,25 @@ class galaxy:
         snapshot = pyn.load(galaxy_path)
         snapshot.physical_units()
         
-        self.halo = snapshot.halos()[1]
-        self.variables = DM_Profiles.model_prep(self.halo, minimum, maximum)
-        self.dmprofiles = self.create_profiles()
+        halo = snapshot.halos()[1]
+        variables = DM_Profiles.model_prep(halo, minimum, maximum)
+        pynprofile = variables[0]
+        self.variables = (1, variables[1], variables[2], variables[3], variables[4], variables[5])
+        self.dmprofiles = self.create_profiles(pynprofile)
         self.C200s = self.comp_C200s()
         
-    def create_profiles(self):
+    def create_profiles(self, pynprofile):
         
         """
         This function takes variables from model_prep and outputs dark matter profile objects list
 
         """
 
-        profile, sm, hm, shm_radius, r_200, t_sf = self.variables #this is because  python2
+        a, sm, hm, shm_radius, r_200, t_sf = self.variables #this is because  python2
+        
         dmprofiles = []
         for model in DM_Profiles.models():
-            dmprofiles.append(DM_Profiles.model(profile, sm, hm, shm_radius, r_200, t_sf, self.galaxy_path, pmodel = model))
+            dmprofiles.append(DM_Profiles.model(pynprofile, sm, hm, shm_radius, r_200, t_sf, self.galaxy_path, pmodel = model))
 
         return dmprofiles
     
