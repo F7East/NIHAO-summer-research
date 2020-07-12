@@ -36,15 +36,22 @@ def model_prep(halo, minimum, p_r200):
         
         r_200 = float(pyn.analysis.halo.virial_radius(halo, overden = 200))
         
-        eps = 2*(halo['eps'][0])
+        # zero-min proof
+        eps = 1.5*(halo['eps'][0])
         
         if minimum < eps:
             minimum = eps
-            
+         
+        # a choice between kpc or portion of r200
         if p_r200 > 1.0:
-            p_r200 = 1.0
+            maximum = p_r200
+        elif p_r200 > 0.0:
+            maximum = r_200 * p_r200
+        else:
+            maximum = 0.1*r_200
             
-        profile = pyn.analysis.profile.Profile(halo.d, min = minimum, max = r_200*p_r200, ndim = 3, type = 'log', nbins = 50)
+            
+        profile = pyn.analysis.profile.Profile(halo.d, min = minimum, max = maximum, ndim = 3, type = 'log', nbins = 50)
         stellar_profile = pyn.analysis.profile.Profile(halo.s, min = 0.01, max = r_200, ndim = 2, type = 'equaln', nbins = 10000)
         shm_radius = stellar_profile['rbins'][len(stellar_profile['rbins'])//2]
 
@@ -162,7 +169,7 @@ class model:
             self.initial_guess = [self.log_den[0], 1]
             self.bounding = ([self.log_den[-1], 0] , numpy.inf)
         
-        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 10000)
+        self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 1000)
         
         self.C_200 = self.r_200 / self.params[1]
         
