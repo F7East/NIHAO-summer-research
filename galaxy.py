@@ -73,7 +73,7 @@ class galaxy:
         b = 0.098
         C200 = 10**a/M200**b
         CNFW = C200
-        eC200 = 0.0 #have to figure this out later
+        eC200 = 10**0.11 #have to figure this out later
         
         C200s.update({"M_NCL" : (C200, eC200)})
         
@@ -81,7 +81,7 @@ class galaxy:
         a = 0.977
         b = 0.130
         C200 = 10**a/M200**b
-        eC200 = 0.0 #have to figure this out later
+        eC200 = 10**0.11 #have to figure this out later
         
         C200s.update({"M_Einasto" : (C200, eC200)})
         
@@ -89,7 +89,7 @@ class galaxy:
         
         X = numpy.log10(self.variables[1]/self.variables[2])
         C200 = CNFW*(1.0+0.00003*numpy.exp(3.4*(X+4.5)))
-        eC200 = 0.0 #same shit here
+        eC200 = 10**0.11 #same shit here
         C200s.update({"M_DC14" : (C200, eC200)})
         
         return C200s
