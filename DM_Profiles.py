@@ -5,7 +5,7 @@ from pynbody import units
 import pynbody as pyn
 from numpy import log10 as lg
 
-def model_prep(halo, minimum, p_r200):
+def model_prep(halo, l_r200, p_r200):
     
     """
     This prepares profile for model to take in. It is run separately because this is a heavy function
@@ -14,6 +14,7 @@ def model_prep(halo, minimum, p_r200):
     
     *halo* is just halo object
     
+    *l_r200* minimum distance from profiling, if > 1 is in units of lenght  if <1 is portion of r_200
     
     **Output**
     
@@ -34,13 +35,22 @@ def model_prep(halo, minimum, p_r200):
     # centering to generate variables and placing particles back 
     with pyn.analysis.angmom.faceon(halo, cen_size  =  '1 kpc'):
         
-        r_200 = float(pyn.analysis.halo.virial_radius(halo, overden = 200))
+        r_200 = float(pyn.analysis.halo.virial_radius(halo, overden = 200, rho_def =  'critical'))
         
         # zero-min proof
         eps = 1.5*(halo['eps'][0])
         
+        if l_r200 > 1.0:
+            minimum = l_r200
+            
+        elif l_r200 >= 0.0:
+            minimum = l_r200 * r_200
+            
+        else:
+            minimum = 0.01 * r_200
+          
         if minimum < eps:
-            minimum = eps
+                minimum = 1.5* eps
          
         # a choice between kpc or portion of r200
         if p_r200 > 1.0:
@@ -48,7 +58,7 @@ def model_prep(halo, minimum, p_r200):
         elif p_r200 > 0.0:
             maximum = r_200 * p_r200
         else:
-            maximum = 0.1*r_200
+            maximum = 0.2*r_200
             
             
         profile = pyn.analysis.profile.Profile(halo.d, min = minimum, max = maximum, ndim = 3, type = 'log', nbins = 50)
@@ -136,8 +146,8 @@ class model:
         
         #Einasto coefficients
         if self.pmodel == 'Einasto_ae':
-            halo_mass.in_units(units.Msol*10**12/units.h)
-            m = lg(halo_mass)
+            HM = float(halo_mass.in_units(units.Msol*10**12/units.h))
+            m = lg(HM)
             v = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
             self.alpha_e = (0.0095*v**2 + 0.155)
             
@@ -148,25 +158,36 @@ class model:
             self.beta  = 4.23 + 1.34*X + 0.26*X**2
             self.gamma = -0.06 + lg(10**((X+2.56)*(-0.68)) + 10**(X+2.56))
             
+        #DC14_X-1.3 coefficients
+        
+        if self.pmodel == 'DC14_X-1.3':
+            X = -1.3
+            self.alpha = 2.94 - lg(10**((X+2.33)*(-1.08)) + 10**((X+2.33)*2.29))
+            self.beta  = 4.23 + 1.34*X + 0.26*X**2
+            self.gamma = -0.06 + lg(10**((X+2.56)*(-0.68)) + 10**(X+2.56))
+            
             
         #coreNFW coefficients
         
-        if self.pmodel == 'coreNFW':
+        if self.pmodel in ('coreNFW', 'coreNFW_ek'):
             self.G = float(units.G.ratio(profile['rbins'].units**3*profile['mass'].units**-1*units.Gyr**-2))
             self.t_sf = t_sf
         
         
         #fitting with different number of parameters
+        
+        self.rs_guess = numpy.power(10, lg(r_200) - 0.83+0.98*lg(self.halo_mass.in_units(units.Msol*10**12/units.h)))
+        
         if self.pmodel == 'Einasto':
-            self.initial_guess = [self.log_den[0], 1, 1]
+            self.initial_guess = [self.log_den[0], self.rs_guess, 1]
             self.bounding = ([self.log_den[-1], 0, -numpy.inf] , numpy.inf)
             
         elif self.pmodel == 'coreNFW':
-            self.initial_guess = [self.log_den[0], 1, 100, 1]
+            self.initial_guess = [self.log_den[0], self.rs_guess, 100, 1]
             self.bounding = ([self.log_den[-1], 0, 0, 0] , numpy.inf)
             
         else:
-            self.initial_guess = [self.log_den[0], 1]
+            self.initial_guess = [self.log_den[0], self.rs_guess]
             self.bounding = ([self.log_den[-1], 0] , numpy.inf)
         
         self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 1000)
@@ -202,10 +223,13 @@ class model:
             return log_rho_s - 2/(self.alpha_e)*((r/r_s)**self.alpha_e-1)*lg(numpy.e)
         if self.pmodel == 'Einasto':
             return log_rho_s - 2/(args[0])*((r/r_s)**args[0])*lg(numpy.e)
-        if self.pmodel == 'DC14':
+        if self.pmodel in ('DC14', 'DC14_X-1.3'):
             return log_rho_s - self.gamma*lg(r/r_s) - (self.beta - self.gamma)/self.alpha*lg(1+(r/r_s)**self.alpha)
         if self.pmodel == 'coreNFW':
             return self.coreNFW(r, log_rho_s, r_s, args[0], args[1])
+        if self.pmodel == 'coreNFW_ek':
+            return self.coreNFW_ek(r, log_rho_s, r_s)
+            
         
     def output(self):
         '''
@@ -236,11 +260,15 @@ class model:
 
     def coreNFW(self, r, log_rho_s, r_s, etta, k):
         return  (2*self.n( log_rho_s, r_s, k)-1)*lg(self.f(r,etta)) + self.NFW(r, log_rho_s, r_s) + lg(self.M_NFW(r, log_rho_s, r_s)) +  lg(self.n( log_rho_s, r_s, k)) + lg(1-self.f(r, etta)**2) - lg(numpy.pi*4*self.r_c(etta)) - 2*lg(r)
-        
-        
+    
+    def coreNFW_ek(self, r, log_rho_s, r_s):
+        etta = 1.75
+        k = 0.04
+        return self.coreNFW(r, log_rho_s, r_s, etta, k)
         
 def models():
     '''
     This is a way of keeping all profile names here
     '''
-    return ('pISO', 'Burket', 'NFW', 'Einasto', 'DC14', 'coreNFW', 'Lucky13')
+    return ('pISO', 'Burket', 'NFW', 'Einasto', 'DC14', 'coreNFW', 'Lucky13', 'DC14_X-1.3', 'Einasto_ae', 'coreNFW_ek')
+    
