@@ -32,24 +32,29 @@ class galaxy:
         snapshot.physical_units()
         
         halo = snapshot.halos()[1]
-        variables = DM_Profiles.model_prep(halo, minimum, maximum)
-        pynprofile = variables[0]
-        self.variables = (1, variables[1], variables[2], variables[3], variables[4], variables[5])
-        self.dmprofiles = self.create_profiles(pynprofile)
-        self.C200s = self.comp_C200s()
+        self.profile = DM_Profiles.model_prep(halo, minimum, maximum)
+        self.reset()
         
-    def create_profiles(self, pynprofile):
+    def reset(self):
+        """
+        This function can be called to change the galaxy if some changes in DM_Profiles were done
+        
+        """
+        self.create_profiles()
+        self.comp_C200s()
+        
+    def create_profiles(self):
         
         """
         This function takes variables from model_prep and outputs dark matter profile objects list
 
         """
-
-        a, sm, hm, shm_radius, r_200, t_sf = self.variables #this is because  python2
         
         dmprofiles = []
         for model in DM_Profiles.models():
-            dmprofiles.append(DM_Profiles.model(pynprofile, sm, hm, shm_radius, r_200, t_sf, self.galaxy_path, pmodel = model))
+            dmprofiles.append(DM_Profiles.model(self.profile, pmodel = model))
+        
+        self.dmprofiles = dmprofiles
 
         return dmprofiles
     
@@ -68,7 +73,7 @@ class galaxy:
         
         #for Maccio 2008 NFW, coreNFW, Lucky (a question: should i do it for different kinds of a and b from the paper)
         
-        M200 = float(self.variables[2].in_units(units.Msol*10**12/units.h))
+        M200 = float(self.profile['M_200'].in_units(units.Msol*10**12/self.profile['h']))
         a = 0.830
         b = 0.098
         C200 = 10**a/M200**b
@@ -87,10 +92,12 @@ class galaxy:
         
         #for DC14
         
-        X = numpy.log10(self.variables[1]/self.variables[2])
+        X = numpy.log10(self.profile['stellar_mass']/self.profile['M_200'])
         C200 = CNFW*(1.0+0.00003*numpy.exp(3.4*(X+4.5)))
         eC200 = 10**0.11 #same shit here
         C200s.update({"M_DC14" : (C200, eC200)})
+        
+        self.C200s = C200s
         
         return C200s
         
