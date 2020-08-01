@@ -18,24 +18,24 @@ def model_prep(halo, l_r200, p_r200):
     
     **Output**
     
-    *profile* is normal pynbody profile for dark matter
+    *profile* which includes
     
     *sm* total stellar mass
-    
-    *hm* total halo mass
     
     *shm_radius* stellar half-mass radius
     
     *r_200* virial radius over 200 times the critical density of snapshot
     
-    *t_sf* run time?
+    *t_sf* run time
+    
+    *M_200
     
     """
     
     # centering to generate variables and placing particles back 
     with pyn.analysis.angmom.faceon(halo, cen_size  =  '1 kpc'):
         
-        r_200 = float(pyn.analysis.halo.virial_radius(halo, overden = 200, rho_def =  'critical'))
+        r_200 = float(pyn.analysis.halo.virial_radius(halo.d, overden = 200, rho_def =  'critical'))
         
         # zero-min proof
         eps = 1.5*(halo['eps'][0])
@@ -50,7 +50,7 @@ def model_prep(halo, l_r200, p_r200):
             minimum = 0.01 * r_200
           
         if minimum < eps:
-                minimum = 1.5* eps
+            minimum = 1.5* eps
          
         # a choice between kpc or portion of r200
         if p_r200 > 1.0:
@@ -68,10 +68,11 @@ def model_prep(halo, l_r200, p_r200):
     # calculating steallar and halo mass
     
     sm = halo.s['mass'].sum()
-    hm = halo['mass'].sum()
     t_sf = halo.properties['time'].in_units('Gyr')
+    
+    profile =  { 'rbins':profile['rbins'], 'density':profile['density'], 'n':profile['n'], 'M_200': pyn.array.SimArray(profile['mass_enc'][-1], units = profile['mass'].units), 'stellar_mass': sm, 'shm_radius':shm_radius, 'r_200':r_200, 'h': pyn.analysis.cosmology.H(halo).in_units(100*  units.km * units.s**-1 * units.Mpc**-1), 't_sf':t_sf}
         
-    return (profile, sm, hm, shm_radius, r_200, t_sf)
+    return profile
 
 class model:
     
@@ -80,13 +81,7 @@ class model:
     
     **Input**
     
-    *profile* a analysis.profile.Profile of already centered halo
-    
-    *name* for graphing and tracking purposes
-    
-    *stellar_mass* total stellar mass of the halo
-    
-    *p_model* specify which model is used to fit the data
+    *see model_prep output
     
     
     **Stores**
@@ -99,6 +94,8 @@ class model:
     
     *log_den_error* using error propagation
     
+    *halo_mass*, *stellar_mass*
+    
     *r_200*, *M_200*, *C_200*
     
     *params* parameters for fit
@@ -109,7 +106,7 @@ class model:
     
     '''
     
-    def __init__(self, profile, stellar_mass, halo_mass, shm_radius, r_200, t_sf, name, pmodel = 'pISO'):
+    def __init__(self, profile, pmodel = 'pISO'):
 
        
         # radii and density
@@ -124,59 +121,50 @@ class model:
             self.den_error.append(profile['density'][i]/(numpy.sqrt(profile['n'][i])))
         
         # 200's
-        self.r_200 = r_200
-        self.M_200 = profile['mass_enc'][-1]
+        self.r_200 = profile['r_200']
+        self.M_200 = profile['M_200']
         self.C_200 = 0.
         
         #for parameters and covariance
         self.params = []
         self.covar  = []
         
-        #name and model
-        self.name = name
+        #model
         self.pmodel = pmodel
         
         #stellar and halo mass, hubble
         
-        self.stellar_mass = stellar_mass
-        self.halo_mass = halo_mass
+        self.stellar_mass = profile['stellar_mass']
         
         #stellar half-mass radius
-        self.shm_radius = shm_radius
+        self.shm_radius = profile['shm_radius']
         
         #Einasto coefficients
         if self.pmodel == 'Einasto_ae':
-            HM = float(halo_mass.in_units(units.Msol*10**12/units.h))
+            HM = float(self.M_200.in_units(units.Msol*10**12/profile['h']))
             m = lg(HM)
             v = 10**(-0.11 + 0.146*m + 0.0138*m**2 + 0.00123*m**3)
             self.alpha_e = (0.0095*v**2 + 0.155)
             
         #DC14 coefficients
         if self.pmodel == 'DC14':
-            X = lg(stellar_mass/halo_mass)
+            X = lg(self.stellar_mass/self.M_200)
+            if X > -1.3:
+                X = -1.3
             self.alpha = 2.94 - lg(10**((X+2.33)*(-1.08)) + 10**((X+2.33)*2.29))
             self.beta  = 4.23 + 1.34*X + 0.26*X**2
-            self.gamma = -0.06 + lg(10**((X+2.56)*(-0.68)) + 10**(X+2.56))
-            
-        #DC14_X-1.3 coefficients
-        
-        if self.pmodel == 'DC14_X-1.3':
-            X = -1.3
-            self.alpha = 2.94 - lg(10**((X+2.33)*(-1.08)) + 10**((X+2.33)*2.29))
-            self.beta  = 4.23 + 1.34*X + 0.26*X**2
-            self.gamma = -0.06 + lg(10**((X+2.56)*(-0.68)) + 10**(X+2.56))
-            
+            self.gamma = -0.06 + lg(10**((X+2.56)*(-0.68)) + 10**(X+2.56))            
             
         #coreNFW coefficients
         
         if self.pmodel in ('coreNFW', 'coreNFW_ek'):
-            self.G = float(units.G.ratio(profile['rbins'].units**3*profile['mass'].units**-1*units.Gyr**-2))
-            self.t_sf = t_sf
+            self.G = float(units.G.ratio(profile['rbins'].units**3*profile['M_200'].units**-1*units.Gyr**-2))
+            self.t_sf = profile['t_sf']
         
         
         #fitting with different number of parameters
         
-        self.rs_guess = numpy.power(10, lg(r_200) - 0.83+0.98*lg(self.halo_mass.in_units(units.Msol*10**12/units.h)))
+        self.rs_guess = numpy.power(10, lg(self.r_200) - 0.83+0.98*lg(self.M_200.in_units(units.Msol*10**12/profile['h'])))
         
         if self.pmodel == 'Einasto':
             self.initial_guess = [self.log_den[0], self.rs_guess, 1]
@@ -190,11 +178,16 @@ class model:
             self.initial_guess = [self.log_den[0], self.rs_guess]
             self.bounding = ([self.log_den[-1], 0] , numpy.inf)
         
+        self.fitting()
+        
+        
+    def fitting(self):
+        """
+        This function does the fitting procedure, takes no input, gives no output
+        """
         self.params, self.covar = fit(self.log_rho, self.radii, self.log_den, sigma = self.log_den_error, absolute_sigma =  True, p0  = self.initial_guess, bounds = self.bounding, maxfev = 1000)
         
         self.C_200 = self.r_200 / self.params[1]
-        
-
         
         
     def log_rho(self, r, log_rho_s, r_s, *args):
@@ -265,10 +258,11 @@ class model:
         etta = 1.75
         k = 0.04
         return self.coreNFW(r, log_rho_s, r_s, etta, k)
-        
+
+    
 def models():
     '''
     This is a way of keeping all profile names here
     '''
-    return ('pISO', 'Burket', 'NFW', 'Einasto', 'DC14', 'coreNFW', 'Lucky13', 'DC14_X-1.3', 'Einasto_ae', 'coreNFW_ek')
+    return ('pISO', 'Burket', 'NFW', 'Einasto', 'Einasto_ae', 'DC14', 'coreNFW', 'Lucky13')
     
