@@ -33,7 +33,8 @@ def model_prep(halo, l_r200, p_r200):
     """
     
     # centering to generate variables and placing particles back 
-    with pyn.analysis.angmom.faceon(halo, cen_size  =  '1 kpc'):
+#     with pyn.analysis.angmom.faceon(halo, cen_size  =  '1 kpc', disk_size = '10 kpc'):
+    with pyn.analysis.halo.center(halo):
         
         r_200 = float(pyn.analysis.halo.virial_radius(halo.d, overden = 200, rho_def =  'critical'))
         
@@ -62,7 +63,7 @@ def model_prep(halo, l_r200, p_r200):
             
             
         profile = pyn.analysis.profile.Profile(halo.d, min = minimum, max = maximum, ndim = 3, type = 'log', nbins = 50)
-        stellar_profile = pyn.analysis.profile.Profile(halo.s, min = 0.01, max = r_200, ndim = 2, type = 'equaln', nbins = 10000)
+        stellar_profile = pyn.analysis.profile.Profile(halo.s, min = 0.01, max = r_200, ndim = 3, type = 'equaln', nbins = 10000)
         shm_radius = stellar_profile['rbins'][len(stellar_profile['rbins'])//2]
 
     # calculating steallar and halo mass
